@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mini_habit_rpg/models/habit.dart';
 import 'package:mini_habit_rpg/services/habit_service.dart';
@@ -36,19 +37,25 @@ class HabitProvider extends ChangeNotifier {
       (habits) {
         _habits = habits;
         _loading = false;
-        notifyListeners();
+        _scheduleNotify();
       },
       onError: (_) {
         _error = 'Failed to load habits.';
         _loading = false;
-        notifyListeners();
+        _scheduleNotify();
       },
     );
   }
 
   Future<void> addHabit(String title) async {
     if (_userId == null || title.trim().isEmpty) return;
-    await _habitService.addHabit(userId: _userId!, title: title);
+    await _habitService.addHabit(userId: _userId!, title: title.trim());
+  }
+
+  void _scheduleNotify() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) notifyListeners();
+    });
   }
 
   Future<Habit?> toggleComplete(Habit habit) async {

@@ -1,39 +1,33 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mini_habit_rpg/models/personality_archetype.dart';
 import 'package:mini_habit_rpg/models/user_profile.dart';
+import 'package:mini_habit_rpg/services/demo_data_store.dart';
 
-/// Firestore operations for `users/{uid}` documents.
+/// User profile storage — local demo (no Firestore).
 class UserService {
-  UserService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  UserService({DemoDataStore? store}) : _store = store ?? DemoDataStore.instance;
 
-  final FirebaseFirestore _firestore;
-
-  CollectionReference<Map<String, dynamic>> get _users =>
-      _firestore.collection('users');
-
-  DocumentReference<Map<String, dynamic>> _doc(String uid) => _users.doc(uid);
+  final DemoDataStore _store;
 
   Future<UserProfile> getOrCreateProfile(String uid) async {
-    final snap = await _doc(uid).get();
-    if (snap.exists && snap.data() != null) {
-      return UserProfile.fromMap(uid, snap.data()!);
-    }
+    await _store.ensureLoaded();
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    final existing = _store.profiles[uid];
+    if (existing != null) return existing;
 
     final initial = UserProfile.initial(uid);
-    await _doc(uid).set(initial.toMap());
+    await _store.emitProfile(initial);
     return initial;
   }
 
   Stream<UserProfile?> watchProfile(String uid) {
-    return _doc(uid).snapshots().map((snap) {
-      if (!snap.exists || snap.data() == null) return null;
-      return UserProfile.fromMap(uid, snap.data()!);
-    });
+    final controller = _store.profileController(uid);
+    Future.microtask(() => controller.add(_store.profiles[uid]));
+    return controller.stream;
   }
 
   Future<void> saveProfile(UserProfile profile) async {
-    await _doc(profile.uid).set(profile.toMap(), SetOptions(merge: true));
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await _store.emitProfile(profile);
   }
 
   Future<void> completeOnboarding({
@@ -42,13 +36,15 @@ class UserService {
     required int avatarId,
     required PersonalityArchetype archetype,
   }) async {
-    await _doc(uid).set({
-      'username': username,
-      'avatarId': avatarId,
-      'archetype': archetype.name,
-      'level': 1,
-      'xp': 0,
-      'streak': 0,
-    }, SetOptions(merge: true));
+    final current = _store.profiles[uid] ?? UserProfile.initial(uid);
+    final updated = current.copyWith(
+      username: username,
+      avatarId: avatarId,
+      archetype: archetype,
+      level: 1,
+      xp: 0,
+      streak: 0,
+    );
+    await saveProfile(updated);
   }
 }

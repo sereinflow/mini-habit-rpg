@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mini_habit_rpg/models/personality_archetype.dart';
 import 'package:mini_habit_rpg/models/user_profile.dart';
 import 'package:mini_habit_rpg/services/user_service.dart';
 import 'package:mini_habit_rpg/utils/xp_calculator.dart';
 
-/// Loads and updates the user's RPG profile from Firestore.
+/// Loads and updates the user's RPG profile (demo store or Firestore when enabled).
 class UserProvider extends ChangeNotifier {
   UserProvider({UserService? userService})
       : _userService = userService ?? UserService();
@@ -41,7 +42,9 @@ class UserProvider extends ChangeNotifier {
       _subscription = _userService.watchProfile(uid).listen((profile) {
         if (profile != null) {
           _profile = profile;
-          notifyListeners();
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            if (hasListeners) notifyListeners();
+          });
         }
       });
     } catch (e) {
