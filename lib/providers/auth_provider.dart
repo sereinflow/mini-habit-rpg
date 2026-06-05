@@ -55,13 +55,9 @@ class AuthProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
       return true;
-    } on AuthException catch (e) {
-      _error = _authService.mapAuthError(e);
-      _loading = false;
-      notifyListeners();
-      return false;
     } catch (e) {
-      _error = 'Something went wrong. Please try again.';
+      _error = _authService.mapAuthError(e) ??
+          'Something went wrong. Please try again.';
       _loading = false;
       notifyListeners();
       return false;
