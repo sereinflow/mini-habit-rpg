@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mini_habit_rpg/providers/achievement_provider.dart';
 import 'package:mini_habit_rpg/providers/auth_provider.dart';
+import 'package:mini_habit_rpg/providers/daily_quest_provider.dart';
 import 'package:mini_habit_rpg/providers/habit_provider.dart';
+import 'package:mini_habit_rpg/providers/mood_provider.dart';
 import 'package:mini_habit_rpg/providers/user_provider.dart';
+import 'package:mini_habit_rpg/screens/stats/statistics_screen.dart';
 import 'package:mini_habit_rpg/theme/app_theme.dart';
 import 'package:mini_habit_rpg/utils/constants.dart';
 import 'package:mini_habit_rpg/widgets/archetype_badge.dart';
+import 'package:mini_habit_rpg/widgets/coin_badge.dart';
+import 'package:mini_habit_rpg/widgets/personality_chart.dart';
 import 'package:mini_habit_rpg/widgets/rpg_card.dart';
 import 'package:mini_habit_rpg/widgets/xp_progress_bar.dart';
 
@@ -34,6 +40,9 @@ class ProfileScreen extends StatelessWidget {
 
     if (confirm != true || !context.mounted) return;
 
+    context.read<AchievementProvider>().reset();
+    context.read<DailyQuestProvider>().reset();
+    context.read<MoodProvider>().reset();
     context.read<HabitProvider>().reset();
     context.read<UserProvider>().reset();
     await context.read<AuthProvider>().signOut();
@@ -54,7 +63,19 @@ class ProfileScreen extends StatelessWidget {
         profile.avatarId.clamp(0, AppConstants.avatarEmojis.length - 1)];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Hero Profile')),
+      appBar: AppBar(
+        title: const Text('Hero Profile'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StatisticsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Container(
         decoration: AppTheme.gradientBackground(profile.archetype),
         child: ListView(
@@ -71,6 +92,8 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Center(child: ArchetypeBadge(archetype: profile.archetype)),
+            const SizedBox(height: 8),
+            Center(child: CoinBadge(coins: profile.coins)),
             const SizedBox(height: 24),
             RpgCard(
               child: Column(
@@ -92,7 +115,7 @@ class ProfileScreen extends StatelessWidget {
                       _StatColumn(
                         icon: Icons.bolt,
                         label: 'Total XP',
-                        value: '${profile.xp}',
+                        value: '${profile.totalXpEarned}',
                       ),
                       _StatColumn(
                         icon: Icons.local_fire_department,
@@ -104,6 +127,8 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            PersonalityChart(profile: profile),
             const SizedBox(height: 16),
             RpgCard(
               child: Column(
