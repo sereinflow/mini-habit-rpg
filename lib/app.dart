@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mini_habit_rpg/models/personality_archetype.dart';
+import 'package:mini_habit_rpg/providers/achievement_provider.dart';
 import 'package:mini_habit_rpg/providers/auth_provider.dart';
+import 'package:mini_habit_rpg/providers/daily_quest_provider.dart';
 import 'package:mini_habit_rpg/providers/habit_provider.dart';
+import 'package:mini_habit_rpg/providers/mood_provider.dart';
 import 'package:mini_habit_rpg/providers/user_provider.dart';
 import 'package:mini_habit_rpg/screens/auth/login_screen.dart';
 import 'package:mini_habit_rpg/screens/home/home_dashboard_screen.dart';
@@ -10,6 +13,7 @@ import 'package:mini_habit_rpg/screens/onboarding/onboarding_screen.dart';
 import 'package:mini_habit_rpg/screens/splash_screen.dart';
 import 'package:mini_habit_rpg/theme/app_theme.dart';
 import 'package:mini_habit_rpg/utils/constants.dart';
+
 /// Root widget — routes users based on auth and onboarding state.
 class MiniHabitRpgApp extends StatelessWidget {
   const MiniHabitRpgApp({super.key});
@@ -21,6 +25,9 @@ class MiniHabitRpgApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => HabitProvider()),
+        ChangeNotifierProvider(create: (_) => DailyQuestProvider()),
+        ChangeNotifierProvider(create: (_) => MoodProvider()),
+        ChangeNotifierProvider(create: (_) => AchievementProvider()),
       ],
       child: const _ThemedApp(),
     );
@@ -96,12 +103,13 @@ class _AuthenticatedGateState extends State<_AuthenticatedGate> {
     final uid = context.read<AuthProvider>().user?.uid;
     if (uid == null) return;
 
-    final userProvider = context.read<UserProvider>();
-    final habitProvider = context.read<HabitProvider>();
-
-    await userProvider.listenToUser(uid);
-    if (!mounted) return;
-    await habitProvider.listenToHabits(uid);
+    await Future.wait([
+      context.read<UserProvider>().listenToUser(uid),
+      context.read<HabitProvider>().listenToHabits(uid),
+      context.read<DailyQuestProvider>().listenToQuests(uid),
+      context.read<MoodProvider>().listenToMood(uid),
+      context.read<AchievementProvider>().listenToAchievements(uid),
+    ]);
 
     if (mounted) setState(() => _initialized = true);
   }

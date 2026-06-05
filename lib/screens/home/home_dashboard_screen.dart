@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mini_habit_rpg/models/achievement.dart';
+import 'package:mini_habit_rpg/models/daily_quest.dart';
 import 'package:mini_habit_rpg/models/habit.dart';
+import 'package:mini_habit_rpg/models/habit_category.dart';
+import 'package:mini_habit_rpg/models/mood.dart';
 import 'package:mini_habit_rpg/models/personality_archetype.dart';
+import 'package:mini_habit_rpg/providers/daily_quest_provider.dart';
 import 'package:mini_habit_rpg/providers/habit_provider.dart';
+import 'package:mini_habit_rpg/providers/mood_provider.dart';
 import 'package:mini_habit_rpg/providers/user_provider.dart';
 import 'package:mini_habit_rpg/screens/profile/profile_screen.dart';
+import 'package:mini_habit_rpg/screens/stats/statistics_screen.dart';
 import 'package:mini_habit_rpg/theme/app_theme.dart';
+import 'package:mini_habit_rpg/utils/mood_recommender.dart';
 import 'package:mini_habit_rpg/utils/quotes.dart';
 import 'package:mini_habit_rpg/widgets/character_card.dart';
+import 'package:mini_habit_rpg/widgets/daily_quest_tile.dart';
 import 'package:mini_habit_rpg/widgets/habit_tile.dart';
+import 'package:mini_habit_rpg/widgets/mood_selector.dart';
+import 'package:mini_habit_rpg/widgets/personality_chart.dart';
 import 'package:mini_habit_rpg/widgets/rpg_card.dart';
 
-/// Main RPG dashboard — character, habits, quote, archetype.
+/// Main RPG dashboard — character, mood, quests, habits, personality.
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
 
@@ -31,19 +42,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   Future<void> _showAddHabitDialog() async {
-    final habitProvider = context.read<HabitProvider>();
-
-    final title = await showDialog<String>(
+    final result = await showDialog<({String title, HabitCategory category})>(
       context: context,
       useRootNavigator: true,
       builder: (ctx) => const _NewQuestDialog(),
     );
 
-    if (!mounted || title == null || title.trim().isEmpty) return;
-
-    await Future<void>.delayed(Duration.zero);
-    if (!mounted) return;
-    await habitProvider.addHabit(title);
+    if (!mounted || result == null || result.title.trim().isEmpty) return;
+    await context.read<HabitProvider>().addHabit(result.title, result.category);
   }
 
   Future<void> _onHabitToggle(Habit habit) async {
@@ -53,13 +59,55 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final completed = await habitProvider.toggleComplete(habit);
     if (completed == null || !mounted) return;
 
-    final leveledUp = await userProvider.applyHabitXp(completed.xpReward);
+    final reward = await userProvider.applyHabitReward(
+      xpReward: completed.xpReward,
+      coinReward: completed.coinReward,
+      category: completed.category,
+    );
 
     if (!mounted) return;
+    _showRewardFeedback(
+      xp: completed.xpReward,
+      coins: completed.coinReward,
+      leveledUp: reward.leveledUp,
+      achievements: reward.newAchievements,
+    );
+  }
+
+  Future<void> _onQuestComplete(DailyQuest quest) async {
+    final questProvider = context.read<DailyQuestProvider>();
+    final userProvider = context.read<UserProvider>();
+
+    final completed = await questProvider.completeQuest(quest);
+    if (completed == null || !mounted) return;
+
+    final reward = await userProvider.applyQuestReward(
+      xpReward: completed.xpReward,
+      coinReward: completed.coinReward,
+    );
+
+    if (!mounted) return;
+    _showRewardFeedback(
+      xp: completed.xpReward,
+      coins: completed.coinReward,
+      leveledUp: reward.leveledUp,
+      achievements: reward.newAchievements,
+      label: 'Daily quest complete!',
+    );
+  }
+
+  void _showRewardFeedback({
+    required int xp,
+    required int coins,
+    required bool leveledUp,
+    required List<AchievementType> achievements,
+    String label = 'Quest complete!',
+  }) {
+    final userProvider = context.read<UserProvider>();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('+${completed.xpReward} XP earned!'),
+        content: Text('$label +$xp XP · +$coins coins'),
         backgroundColor: Theme.of(context).colorScheme.primary,
       ),
     );
@@ -81,12 +129,32 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         ),
       );
     }
+
+    for (final achievement in achievements) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Achievement Unlocked!'),
+          content: Text(
+            '${achievement.name}\n${achievement.description}\n+${achievement.xpReward} XP · +${achievement.coinReward} coins',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Awesome'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
     final habitProvider = context.watch<HabitProvider>();
+    final questProvider = context.watch<DailyQuestProvider>();
+    final moodProvider = context.watch<MoodProvider>();
     final profile = userProvider.profile;
 
     if (profile == null) {
@@ -95,18 +163,40 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       );
     }
 
+    final mood = moodProvider.currentMood ?? Mood.motivated;
+    final recommended = MoodRecommender.recommend(habitProvider.habits, mood);
+    final recommendedIds = recommended.map((h) => h.id).toSet();
+
     return Scaffold(
       body: Container(
         decoration: AppTheme.gradientBackground(profile.archetype),
         child: SafeArea(
           child: RefreshIndicator(
-            onRefresh: () async {},
+            onRefresh: () async {
+              final uid = profile.uid;
+              await Future.wait([
+                userProvider.listenToUser(uid),
+                habitProvider.listenToHabits(uid),
+                questProvider.listenToQuests(uid),
+              ]);
+            },
             child: CustomScrollView(
               slivers: [
                 SliverAppBar(
                   floating: true,
                   title: const Text('Quest Board'),
                   actions: [
+                    IconButton(
+                      icon: const Icon(Icons.bar_chart),
+                      tooltip: 'Statistics',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const StatisticsScreen(),
+                          ),
+                        );
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.person_outline),
                       onPressed: () {
@@ -124,6 +214,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       CharacterCard(profile: profile),
+                      const SizedBox(height: 16),
+                      MoodSelector(
+                        selected: moodProvider.currentMood,
+                        onSelected: moodProvider.selectMood,
+                      ),
+                      const SizedBox(height: 16),
+                      PersonalityChart(profile: profile),
                       const SizedBox(height: 16),
                       RpgCard(
                         accentColor:
@@ -150,7 +247,39 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Today's Quests",
+                            'Daily Quests',
+                            style:
+                                Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            '${questProvider.completedQuests.length}/${questProvider.quests.length} done',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (questProvider.isLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else if (questProvider.quests.isEmpty)
+                        const RpgCard(
+                          child: Text('Generating today\'s quests...'),
+                        )
+                      else
+                        ...questProvider.quests.map(
+                          (q) => DailyQuestTile(
+                            key: ValueKey(q.id),
+                            quest: q,
+                            onComplete: () => _onQuestComplete(q),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            recommended.isNotEmpty
+                                ? 'Recommended for ${mood.label}'
+                                : "Today's Habits",
                             style:
                                 Theme.of(context).textTheme.titleMedium,
                           ),
@@ -190,6 +319,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                           (h) => HabitTile(
                             key: ValueKey(h.id),
                             habit: h,
+                            recommended: recommendedIds.contains(h.id),
                             onToggle: () => _onHabitToggle(h),
                             onDelete: () =>
                                 habitProvider.deleteHabit(h.id),
@@ -213,7 +343,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 }
 
-/// Dialog with its own controller lifecycle (avoids dispose during route pop).
 class _NewQuestDialog extends StatefulWidget {
   const _NewQuestDialog();
 
@@ -223,6 +352,7 @@ class _NewQuestDialog extends StatefulWidget {
 
 class _NewQuestDialogState extends State<_NewQuestDialog> {
   final _controller = TextEditingController();
+  HabitCategory _category = HabitCategory.study;
 
   @override
   void dispose() {
@@ -233,20 +363,41 @@ class _NewQuestDialogState extends State<_NewQuestDialog> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    Navigator.of(context).pop(text);
+    Navigator.of(context).pop((title: text, category: _category));
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('New Quest'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: const InputDecoration(
-          hintText: 'e.g. Read 10 pages',
-        ),
-        onSubmitted: (_) => _submit(),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'e.g. Read 10 pages',
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<HabitCategory>(
+            initialValue: _category,
+            decoration: const InputDecoration(labelText: 'Category'),
+            items: HabitCategory.values
+                .map(
+                  (c) => DropdownMenuItem(
+                    value: c,
+                    child: Text('${c.emoji} ${c.label}'),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => _category = v);
+            },
+          ),
+        ],
       ),
       actions: [
         TextButton(

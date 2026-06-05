@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:mini_habit_rpg/models/user_profile.dart';
 import 'package:mini_habit_rpg/utils/constants.dart';
 import 'package:mini_habit_rpg/widgets/archetype_badge.dart';
+import 'package:mini_habit_rpg/widgets/coin_badge.dart';
 import 'package:mini_habit_rpg/widgets/rpg_card.dart';
 import 'package:mini_habit_rpg/widgets/xp_progress_bar.dart';
 
-/// Hero card on the dashboard — avatar, name, level, XP, streak.
+/// Hero card on the dashboard — avatar, name, level, XP, streak, coins.
 class CharacterCard extends StatelessWidget {
   const CharacterCard({super.key, required this.profile});
 
@@ -81,7 +82,12 @@ class CharacterCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: CoinBadge(coins: profile.coins),
+          ),
+          const SizedBox(height: 12),
           XpProgressBar(
             currentXp: profile.xp,
             maxXp: profile.xpToNextLevel,
