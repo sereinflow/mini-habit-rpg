@@ -1,30 +1,68 @@
 import 'package:mini_habit_rpg/models/app_user.dart';
+import 'package:mini_habit_rpg/models/user_profile.dart';
+import 'package:mini_habit_rpg/repositories/profile_repository.dart';
 import 'package:mini_habit_rpg/services/demo_data_store.dart';
+import 'package:mini_habit_rpg/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Thrown when demo sign-in / sign-up validation fails.
+/// Thrown when sign-in / sign-up validation fails.
 class AuthException implements Exception {
   AuthException(this.message);
   final String message;
 }
 
-/// Email/password auth — local demo storage (no Firebase).
+/// Email/password auth — demo store or Supabase Auth.
 class AuthService {
-  AuthService({DemoDataStore? store}) : _store = store ?? DemoDataStore.instance;
+  AuthService({
+    DemoDataStore? store,
+    ProfileRepository? profileRepository,
+  })  : _store = store ?? DemoDataStore.instance,
+        _profiles = profileRepository ?? ProfileRepository();
 
   final DemoDataStore _store;
+  final ProfileRepository _profiles;
 
-  Stream<AppUser?> get authStateChanges => _store.authStateChanges;
+  Stream<AppUser?> get authStateChanges {
+    if (SupabaseService.isReady) {
+      return SupabaseService.client.auth.onAuthStateChange.map((event) {
+        final user = event.session?.user;
+        if (user == null) return null;
+        return AppUser(uid: user.id, email: user.email ?? '');
+      });
+    }
+    return _store.authStateChanges;
+  }
 
-  AppUser? get currentUser => _store.currentUser;
+  AppUser? get currentUser {
+    if (SupabaseService.isReady) {
+      final user = SupabaseService.client.auth.currentUser;
+      if (user == null) return null;
+      return AppUser(uid: user.id, email: user.email ?? '');
+    }
+    return _store.currentUser;
+  }
 
   Future<void> signUp({
     required String email,
     required String password,
   }) async {
-    await _store.ensureLoaded();
     final normalized = email.trim().toLowerCase();
     _validateCredentials(normalized, password);
 
+    if (SupabaseService.isReady) {
+      final response = await SupabaseService.client.auth.signUp(
+        email: normalized,
+        password: password,
+      );
+      final user = response.user;
+      if (user == null) {
+        throw AuthException('Sign up failed. Please try again.');
+      }
+      await _profiles.save(UserProfile.initial(user.id));
+      return;
+    }
+
+    await _store.ensureLoaded();
     if (_store.emailToUid.containsKey(normalized)) {
       throw AuthException('This email is already registered.');
     }
@@ -35,7 +73,6 @@ class AuthService {
       password: password,
       user: user,
     );
-    await Future<void>.delayed(const Duration(milliseconds: 300));
     _store.emitAuth(user);
   }
 
@@ -43,25 +80,39 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    await _store.ensureLoaded();
     final normalized = email.trim().toLowerCase();
     _validateCredentials(normalized, password);
 
+    if (SupabaseService.isReady) {
+      await SupabaseService.client.auth.signInWithPassword(
+        email: normalized,
+        password: password,
+      );
+      return;
+    }
+
+    await _store.ensureLoaded();
     if (!_store.verifyLogin(normalized, password)) {
       throw AuthException('Invalid email or password.');
     }
 
     final uid = _store.emailToUid[normalized]!;
-    await Future<void>.delayed(const Duration(milliseconds: 200));
     _store.emitAuth(AppUser(uid: uid, email: normalized));
   }
 
   Future<void> signOut() async {
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (SupabaseService.isReady) {
+      await SupabaseService.client.auth.signOut();
+      return;
+    }
     _store.emitAuth(null);
   }
 
-  String? mapAuthError(AuthException e) => e.message;
+  String? mapAuthError(Object e) {
+    if (e is AuthException) return e.message;
+    if (e is AuthApiException) return e.message;
+    return 'Authentication failed. Please try again.';
+  }
 
   void _validateCredentials(String email, String password) {
     if (!email.contains('@')) {

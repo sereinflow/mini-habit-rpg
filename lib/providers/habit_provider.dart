@@ -1,8 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:mini_habit_rpg/models/habit.dart';
+import 'package:mini_habit_rpg/models/habit_category.dart';
 import 'package:mini_habit_rpg/services/habit_service.dart';
 
 /// Manages habit list CRUD and completion toggles.
@@ -26,6 +27,11 @@ class HabitProvider extends ChangeNotifier {
   bool get isLoading => _loading;
   String? get error => _error;
 
+  double get completionPercentage {
+    if (_habits.isEmpty) return 0;
+    return (todayCompleted.length / _habits.length) * 100;
+  }
+
   Future<void> listenToHabits(String userId) async {
     if (_userId == userId && _subscription != null) return;
     _userId = userId;
@@ -47,9 +53,13 @@ class HabitProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> addHabit(String title) async {
+  Future<void> addHabit(String title, HabitCategory category) async {
     if (_userId == null || title.trim().isEmpty) return;
-    await _habitService.addHabit(userId: _userId!, title: title.trim());
+    await _habitService.addHabit(
+      userId: _userId!,
+      title: title.trim(),
+      category: category,
+    );
   }
 
   void _scheduleNotify() {
@@ -77,7 +87,8 @@ class HabitProvider extends ChangeNotifier {
   }
 
   Future<void> deleteHabit(String habitId) async {
-    await _habitService.deleteHabit(habitId);
+    if (_userId == null) return;
+    await _habitService.deleteHabit(habitId, _userId!);
   }
 
   void reset() {
