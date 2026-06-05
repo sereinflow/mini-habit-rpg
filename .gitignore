@@ -46,6 +46,10 @@ app.*.map.json
 
 # Local team guides (keep outside the repo)
 /docs/
+*.local.md
+.env
+.env.*
+lib/config/supabase_secrets.dart
 
 # Firebase local config (optional — some teams commit google-services.json)
 # android/app/google-services.json
