@@ -6,10 +6,13 @@ import 'package:mini_habit_rpg/providers/habit_provider.dart';
 import 'package:mini_habit_rpg/providers/user_provider.dart';
 import 'package:mini_habit_rpg/theme/app_theme.dart';
 import 'package:mini_habit_rpg/widgets/achievement_tile.dart';
+import 'package:mini_habit_rpg/widgets/category_analysis_chart.dart';
 import 'package:mini_habit_rpg/widgets/personality_chart.dart';
 import 'package:mini_habit_rpg/widgets/rpg_card.dart';
+import 'package:mini_habit_rpg/widgets/weekly_progress_chart.dart';
+import 'package:mini_habit_rpg/widgets/xp_chart.dart';
 
-/// Professional statistics dashboard.
+/// Professional statistics dashboard with charts and category analysis.
 class StatisticsScreen extends StatelessWidget {
   const StatisticsScreen({super.key});
 
@@ -29,10 +32,9 @@ class StatisticsScreen extends StatelessWidget {
         .map((a) => a.achievementName)
         .toSet();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Statistics')),
-      body: Container(
-        decoration: AppTheme.gradientBackground(profile.archetype),
+    return Container(
+      decoration: AppTheme.gradientBackground(profile.archetype),
+      child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -68,18 +70,6 @@ class StatisticsScreen extends StatelessWidget {
                   color: Colors.deepOrange,
                 ),
                 _StatCard(
-                  icon: Icons.star,
-                  label: 'Total XP Earned',
-                  value: '${profile.totalXpEarned}',
-                  color: Colors.amber,
-                ),
-                _StatCard(
-                  icon: Icons.monetization_on,
-                  label: 'Coins',
-                  value: '${profile.coins}',
-                  color: Colors.yellow,
-                ),
-                _StatCard(
                   icon: Icons.pie_chart,
                   label: 'Today\'s Completion',
                   value:
@@ -89,6 +79,12 @@ class StatisticsScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
+            WeeklyProgressChart(habits: habitProvider.habits),
+            const SizedBox(height: 16),
+            XpChart(profile: profile),
+            const SizedBox(height: 16),
+            CategoryAnalysisChart(habits: habitProvider.habits),
+            const SizedBox(height: 16),
             PersonalityChart(profile: profile),
             const SizedBox(height: 24),
             Text(
@@ -102,7 +98,7 @@ class StatisticsScreen extends StatelessWidget {
                 unlocked: unlockedIds.contains(type.id),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 80),
           ],
         ),
       ),
