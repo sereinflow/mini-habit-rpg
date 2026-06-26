@@ -46,6 +46,7 @@ app.*.map.json
 
 # Local team guides (keep outside the repo)
 /docs/
+PROJECT_WORKFLOW.md
 *.local.md
 .env
 .env.*
