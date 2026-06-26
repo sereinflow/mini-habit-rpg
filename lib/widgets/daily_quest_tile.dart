@@ -1,25 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:mini_habit_rpg/models/daily_quest.dart';
 
-/// Single daily quest row with rewards.
+/// Single daily quest row with type badge and rewards.
 class DailyQuestTile extends StatelessWidget {
   const DailyQuestTile({
     super.key,
     required this.quest,
     required this.onComplete,
+    this.highlighted = false,
+    this.accentColor,
   });
 
   final DailyQuest quest;
   final VoidCallback onComplete;
+  final bool highlighted;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.secondary;
+    final accent = accentColor ??
+        (highlighted
+            ? quest.questType.color
+            : Theme.of(context).colorScheme.secondary);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       color: quest.completed
           ? Colors.white.withValues(alpha: 0.04)
+          : highlighted
+              ? accent.withValues(alpha: 0.08)
+              : null,
+      shape: highlighted
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: accent.withValues(alpha: 0.5)),
+            )
           : null,
       child: ListTile(
         leading: GestureDetector(
@@ -40,16 +55,41 @@ class DailyQuestTile extends StatelessWidget {
             ),
             child: quest.completed
                 ? const Icon(Icons.check, color: Colors.white, size: 22)
-                : const Icon(Icons.auto_awesome, color: Colors.white38, size: 20),
+                : Text(
+                    quest.questType.emoji,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18),
+                  ),
           ),
         ),
-        title: Text(
-          quest.title,
-          style: TextStyle(
-            decoration:
-                quest.completed ? TextDecoration.lineThrough : null,
-            color: quest.completed ? Colors.white54 : null,
-          ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                quest.title,
+                style: TextStyle(
+                  decoration:
+                      quest.completed ? TextDecoration.lineThrough : null,
+                  color: quest.completed ? Colors.white54 : null,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: quest.questType.color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                quest.questType.label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: quest.questType.color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
         subtitle: Text(
           '+${quest.xpReward} XP · +${quest.coinReward} coins',

@@ -1,9 +1,9 @@
-/// Player mood — affects which habits are recommended on the quest board.
+/// Player mood — affects theme, recommendations, and quest filtering.
 enum Mood {
   motivated('Motivated', '🔥', 'High energy — tackle any quest'),
   tired('Tired', '😴', 'Light quests — easy wins only'),
-  happy('Happy', '😊', 'Creative quests feel best today'),
-  stressed('Stressed', '😰', 'Movement & discipline help most');
+  stressed('Stressed', '😰', 'Wellness habits help most'),
+  happy('Happy', '😊', 'Bonus quests feel best today');
 
   const Mood(this.label, this.emoji, this.hint);
 

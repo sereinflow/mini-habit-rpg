@@ -9,6 +9,7 @@ import 'package:mini_habit_rpg/models/habit_category.dart';
 import 'package:mini_habit_rpg/models/mood.dart';
 import 'package:mini_habit_rpg/models/mood_entry.dart';
 import 'package:mini_habit_rpg/models/personality_archetype.dart';
+import 'package:mini_habit_rpg/models/quest_type.dart';
 import 'package:mini_habit_rpg/models/user_profile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -380,6 +381,8 @@ class DemoDataStore {
         'coinReward': q.coinReward,
         'completed': q.completed,
         'questDate': q.questDate,
+        'questType': q.questType.name,
+        if (q.mood != null) 'mood': q.mood!.name,
       };
 
   DailyQuest _questFromJson(Map<String, dynamic> json) {
@@ -391,6 +394,10 @@ class DemoDataStore {
       coinReward: json['coinReward'] as int? ?? 10,
       completed: json['completed'] as bool? ?? false,
       questDate: json['questDate'] as String? ?? '',
+      questType: QuestType.fromString(json['questType'] as String?),
+      mood: json['mood'] != null
+          ? Mood.fromString(json['mood'] as String?)
+          : null,
     );
   }
 

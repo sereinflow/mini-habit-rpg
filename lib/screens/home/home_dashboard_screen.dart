@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mini_habit_rpg/models/achievement.dart';
-import 'package:mini_habit_rpg/models/daily_quest.dart';
 import 'package:mini_habit_rpg/models/habit.dart';
 import 'package:mini_habit_rpg/models/habit_category.dart';
 import 'package:mini_habit_rpg/models/mood.dart';
@@ -10,19 +9,17 @@ import 'package:mini_habit_rpg/providers/daily_quest_provider.dart';
 import 'package:mini_habit_rpg/providers/habit_provider.dart';
 import 'package:mini_habit_rpg/providers/mood_provider.dart';
 import 'package:mini_habit_rpg/providers/user_provider.dart';
-import 'package:mini_habit_rpg/screens/profile/profile_screen.dart';
-import 'package:mini_habit_rpg/screens/stats/statistics_screen.dart';
-import 'package:mini_habit_rpg/theme/app_theme.dart';
+import 'package:mini_habit_rpg/theme/mood_theme.dart';
 import 'package:mini_habit_rpg/utils/mood_recommender.dart';
 import 'package:mini_habit_rpg/utils/quotes.dart';
+import 'package:mini_habit_rpg/widgets/achievement_unlock_dialog.dart';
 import 'package:mini_habit_rpg/widgets/character_card.dart';
-import 'package:mini_habit_rpg/widgets/daily_quest_tile.dart';
 import 'package:mini_habit_rpg/widgets/habit_tile.dart';
 import 'package:mini_habit_rpg/widgets/mood_selector.dart';
-import 'package:mini_habit_rpg/widgets/personality_chart.dart';
+import 'package:mini_habit_rpg/widgets/recommended_tasks_panel.dart';
 import 'package:mini_habit_rpg/widgets/rpg_card.dart';
 
-/// Main RPG dashboard — character, mood, quests, habits, personality.
+/// Home tab — character summary, mood banner, recommended habits.
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
 
@@ -36,9 +33,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    final archetype = context.read<UserProvider>().profile?.archetype ??
+    final archetype =
+        context.read<UserProvider>().profile?.archetype ??
         PersonalityArchetype.warrior;
     _quote = MotivationalQuotes.randomFor(archetype);
+  }
+
+  Future<void> _onMoodSelected(Mood mood) async {
+    final questProvider = context.read<DailyQuestProvider>();
+    await context.read<MoodProvider>().selectMood(mood);
+    await questProvider.regenerateForMood(mood);
   }
 
   Future<void> _showAddHabitDialog() async {
@@ -74,40 +78,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 
-  Future<void> _onQuestComplete(DailyQuest quest) async {
-    final questProvider = context.read<DailyQuestProvider>();
-    final userProvider = context.read<UserProvider>();
-
-    final completed = await questProvider.completeQuest(quest);
-    if (completed == null || !mounted) return;
-
-    final reward = await userProvider.applyQuestReward(
-      xpReward: completed.xpReward,
-      coinReward: completed.coinReward,
-    );
-
-    if (!mounted) return;
-    _showRewardFeedback(
-      xp: completed.xpReward,
-      coins: completed.coinReward,
-      leveledUp: reward.leveledUp,
-      achievements: reward.newAchievements,
-      label: 'Daily quest complete!',
-    );
-  }
-
   void _showRewardFeedback({
     required int xp,
     required int coins,
     required bool leveledUp,
     required List<AchievementType> achievements,
-    String label = 'Quest complete!',
   }) {
     final userProvider = context.read<UserProvider>();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label +$xp XP · +$coins coins'),
+        content: Text('Quest complete! +$xp XP · +$coins coins'),
         backgroundColor: Theme.of(context).colorScheme.primary,
       ),
     );
@@ -131,21 +112,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     }
 
     for (final achievement in achievements) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Achievement Unlocked!'),
-          content: Text(
-            '${achievement.name}\n${achievement.description}\n+${achievement.xpReward} XP · +${achievement.coinReward} coins',
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Awesome'),
-            ),
-          ],
-        ),
-      );
+      AchievementUnlockDialog.show(context, achievement);
     }
   }
 
@@ -153,23 +120,23 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
     final habitProvider = context.watch<HabitProvider>();
-    final questProvider = context.watch<DailyQuestProvider>();
     final moodProvider = context.watch<MoodProvider>();
     final profile = userProvider.profile;
 
     if (profile == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final mood = moodProvider.currentMood ?? Mood.motivated;
+    final moodTheme = MoodTheme.forMood(mood);
     final recommended = MoodRecommender.recommend(habitProvider.habits, mood);
     final recommendedIds = recommended.map((h) => h.id).toSet();
 
     return Scaffold(
-      body: Container(
-        decoration: AppTheme.gradientBackground(profile.archetype),
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        decoration: moodTheme.backgroundDecoration,
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
@@ -177,37 +144,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               await Future.wait([
                 userProvider.listenToUser(uid),
                 habitProvider.listenToHabits(uid),
-                questProvider.listenToQuests(uid),
               ]);
             },
             child: CustomScrollView(
               slivers: [
                 SliverAppBar(
                   floating: true,
+                  backgroundColor: Colors.transparent,
                   title: const Text('Quest Board'),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.bar_chart),
-                      tooltip: 'Statistics',
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const StatisticsScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.person_outline),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -217,25 +161,25 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       const SizedBox(height: 16),
                       MoodSelector(
                         selected: moodProvider.currentMood,
-                        onSelected: moodProvider.selectMood,
+                        moodTheme: moodTheme,
+                        onSelected: _onMoodSelected,
                       ),
                       const SizedBox(height: 16),
-                      PersonalityChart(profile: profile),
+                      RecommendedTasksPanel(theme: moodTheme),
                       const SizedBox(height: 16),
                       RpgCard(
-                        accentColor:
-                            Theme.of(context).colorScheme.secondary,
+                        accentColor: moodTheme.secondary,
                         child: Row(
                           children: [
-                            const Icon(Icons.format_quote,
-                                color: Colors.white38),
+                            const Icon(
+                              Icons.format_quote,
+                              color: Colors.white38,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 _quote,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
+                                style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(fontStyle: FontStyle.italic),
                               ),
                             ),
@@ -247,41 +191,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Daily Quests',
-                            style:
-                                Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            '${questProvider.completedQuests.length}/${questProvider.quests.length} done',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (questProvider.isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else if (questProvider.quests.isEmpty)
-                        const RpgCard(
-                          child: Text('Generating today\'s quests...'),
-                        )
-                      else
-                        ...questProvider.quests.map(
-                          (q) => DailyQuestTile(
-                            key: ValueKey(q.id),
-                            quest: q,
-                            onComplete: () => _onQuestComplete(q),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
                             recommended.isNotEmpty
                                 ? 'Recommended for ${mood.label}'
                                 : "Today's Habits",
-                            style:
-                                Theme.of(context).textTheme.titleMedium,
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                           Text(
                             '${habitProvider.todayCompleted.length}/${habitProvider.habits.length} done',
@@ -301,15 +214,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                         RpgCard(
                           child: Column(
                             children: [
-                              const Text('🗺️',
-                                  style: TextStyle(fontSize: 40)),
+                              const Text('🗺️', style: TextStyle(fontSize: 40)),
                               const SizedBox(height: 8),
                               const Text('No quests yet.'),
                               const SizedBox(height: 4),
                               Text(
                                 'Tap + to add your first habit.',
-                                style:
-                                    Theme.of(context).textTheme.bodySmall,
+                                style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
                           ),
@@ -321,8 +232,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                             habit: h,
                             recommended: recommendedIds.contains(h.id),
                             onToggle: () => _onHabitToggle(h),
-                            onDelete: () =>
-                                habitProvider.deleteHabit(h.id),
+                            onDelete: () => habitProvider.deleteHabit(h.id),
                           ),
                         ),
                       const SizedBox(height: 80),
@@ -376,9 +286,7 @@ class _NewQuestDialogState extends State<_NewQuestDialog> {
           TextField(
             controller: _controller,
             autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'e.g. Read 10 pages',
-            ),
+            decoration: const InputDecoration(hintText: 'e.g. Read 10 pages'),
             onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 16),
@@ -404,10 +312,7 @@ class _NewQuestDialogState extends State<_NewQuestDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
-          onPressed: _submit,
-          child: const Text('Add'),
-        ),
+        ElevatedButton(onPressed: _submit, child: const Text('Add')),
       ],
     );
   }

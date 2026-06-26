@@ -4,7 +4,7 @@
 
 Mini Habit RPG transforms everyday habit tracking into a role-playing game. Users build habits as quests, earn experience points and coins, level up a character, and evolve an adaptive personality based on habit categories.
 
-**Current completion: ~50%** — cloud backend ready, mood system, daily quests, achievements, coins, statistics, and personality evolution.
+**Current completion: ~70%** — mood-themed UI, quest types, character screen, bottom navigation, enhanced statistics, achievement animations, and expanded habit categories.
 
 ## Key Features
 
@@ -27,7 +27,17 @@ Mini Habit RPG transforms everyday habit tracking into a role-playing game. User
 - **Statistics dashboard** — completion %, streaks, XP, achievements
 - **Adaptive personality** — Scholar/Warrior/Artist percentages from categories
 
-### Planned (Phase 3)
+### Phase 3 — Done
+
+- **Advanced mood system** — dedicated mood screen with themes, gradients, and recommendations
+- **Quest types** — Normal, Challenge, Bonus, Wellness linked to mood
+- **Character screen** — RPG profile with class stats and personality evolution
+- **Habit categories** — Study, Fitness, Health, Creativity, Social
+- **Statistics upgrade** — weekly progress, XP charts, category analysis
+- **Achievement animations** — animated unlock popup
+- **Bottom navigation** — Home, Quests, Character, Stats, Profile
+
+### Planned (Phase 4)
 
 - Energy system
 - Boss battle challenges

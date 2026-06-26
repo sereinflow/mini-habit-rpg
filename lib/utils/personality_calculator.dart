@@ -21,19 +21,21 @@ class PersonalityCalculator {
   static const int pointsPerCompletion = 10;
 
   static UserProfile awardPoints(UserProfile profile, HabitCategory category) {
-    switch (category) {
-      case HabitCategory.study:
+    switch (category.archetype.name) {
+      case 'scholar':
         return profile.copyWith(
           scholarPoints: profile.scholarPoints + pointsPerCompletion,
         );
-      case HabitCategory.fitness:
+      case 'warrior':
         return profile.copyWith(
           warriorPoints: profile.warriorPoints + pointsPerCompletion,
         );
-      case HabitCategory.creative:
+      case 'artist':
         return profile.copyWith(
           artistPoints: profile.artistPoints + pointsPerCompletion,
         );
+      default:
+        return profile;
     }
   }
 

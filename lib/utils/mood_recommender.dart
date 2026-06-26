@@ -18,18 +18,24 @@ class MoodRecommender {
         return List<Habit>.from(incomplete)
           ..sort((a, b) => a.xpReward.compareTo(b.xpReward));
       case Mood.happy:
-        return _filterByCategory(incomplete, HabitCategory.creative);
+        return _filterByCategories(
+          incomplete,
+          [HabitCategory.creative, HabitCategory.social],
+        );
       case Mood.stressed:
-        return _filterByCategory(incomplete, HabitCategory.fitness);
+        return _filterByCategories(
+          incomplete,
+          [HabitCategory.health, HabitCategory.fitness],
+        );
     }
   }
 
-  static List<Habit> _filterByCategory(
+  static List<Habit> _filterByCategories(
     List<Habit> habits,
-    HabitCategory preferred,
+    List<HabitCategory> preferred,
   ) {
     final preferredHabits =
-        habits.where((h) => h.category == preferred).toList();
+        habits.where((h) => preferred.contains(h.category)).toList();
     if (preferredHabits.isNotEmpty) return preferredHabits;
     return habits;
   }
