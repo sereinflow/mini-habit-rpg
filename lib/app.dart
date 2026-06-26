@@ -8,7 +8,7 @@ import 'package:mini_habit_rpg/providers/habit_provider.dart';
 import 'package:mini_habit_rpg/providers/mood_provider.dart';
 import 'package:mini_habit_rpg/providers/user_provider.dart';
 import 'package:mini_habit_rpg/screens/auth/login_screen.dart';
-import 'package:mini_habit_rpg/screens/home/home_dashboard_screen.dart';
+import 'package:mini_habit_rpg/screens/main/main_shell.dart';
 import 'package:mini_habit_rpg/screens/onboarding/onboarding_screen.dart';
 import 'package:mini_habit_rpg/screens/splash_screen.dart';
 import 'package:mini_habit_rpg/theme/app_theme.dart';
@@ -39,7 +39,8 @@ class _ThemedApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final archetype = context.watch<UserProvider>().profile?.archetype ??
+    final archetype =
+        context.watch<UserProvider>().profile?.archetype ??
         PersonalityArchetype.warrior;
 
     return MaterialApp(
@@ -103,13 +104,17 @@ class _AuthenticatedGateState extends State<_AuthenticatedGate> {
     final uid = context.read<AuthProvider>().user?.uid;
     if (uid == null) return;
 
+    final dailyQuestProvider = context.read<DailyQuestProvider>();
+    final mood = context.read<MoodProvider>().currentMood;
+
     await Future.wait([
       context.read<UserProvider>().listenToUser(uid),
       context.read<HabitProvider>().listenToHabits(uid),
-      context.read<DailyQuestProvider>().listenToQuests(uid),
       context.read<MoodProvider>().listenToMood(uid),
       context.read<AchievementProvider>().listenToAchievements(uid),
     ]);
+
+    await dailyQuestProvider.listenToQuests(uid, mood: mood);
 
     if (mounted) setState(() => _initialized = true);
   }
@@ -130,6 +135,6 @@ class _AuthenticatedGateState extends State<_AuthenticatedGate> {
       return const OnboardingScreen();
     }
 
-    return const HomeDashboardScreen();
+    return const MainShell();
   }
 }

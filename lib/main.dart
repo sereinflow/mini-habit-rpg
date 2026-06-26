@@ -11,6 +11,13 @@ Future<void> main() async {
   if (AppConfig.useSupabase) {
     await SupabaseService.initialize();
   } else {
+    if (!AppConfig.demoMode) {
+      // demoMode is false but dart-defines were not passed — falls back to local storage.
+      debugPrint(
+        '⚠️ Supabase not configured. Pass SUPABASE_URL and SUPABASE_ANON_KEY '
+        'via --dart-define when running. Using local demo storage instead.',
+      );
+    }
     await DemoDataStore.instance.load();
   }
 
