@@ -4,7 +4,9 @@ import 'package:mini_habit_rpg/models/personality_archetype.dart';
 enum HabitCategory {
   study('Study', '📚', PersonalityArchetype.scholar),
   fitness('Fitness', '💪', PersonalityArchetype.warrior),
-  creative('Creative', '🎨', PersonalityArchetype.artist);
+  health('Health', '💚', PersonalityArchetype.warrior),
+  creative('Creativity', '🎨', PersonalityArchetype.artist),
+  social('Social', '🤝', PersonalityArchetype.artist);
 
   const HabitCategory(this.label, this.emoji, this.archetype);
 
@@ -13,6 +15,7 @@ enum HabitCategory {
   final PersonalityArchetype archetype;
 
   static HabitCategory fromString(String? value) {
+    if (value == null) return HabitCategory.study;
     return HabitCategory.values.firstWhere(
       (c) => c.name == value,
       orElse: () => HabitCategory.study,
