@@ -4,7 +4,7 @@
 
 Mini Habit RPG transforms everyday habit tracking into a role-playing game. Users build habits as quests, earn experience points and coins, level up a character, and evolve an adaptive personality based on habit categories.
 
-**Current completion: ~70%** — mood-themed UI, quest types, character screen, bottom navigation, enhanced statistics, achievement animations, and expanded habit categories.
+**Current completion: 100%** — all core RPG systems, cloud backend syncing, custom shop & inventory customizations, daily login rewards, and settings dashboards are fully implemented.
 
 ## Key Features
 
@@ -37,12 +37,14 @@ Mini Habit RPG transforms everyday habit tracking into a role-playing game. User
 - **Achievement animations** — animated unlock popup
 - **Bottom navigation** — Home, Quests, Character, Stats, Profile
 
-### Planned (Phase 4)
+### Phase 4 — Done
 
-- Energy system
-- Boss battle challenges
-- Advanced reward shop
-- Social / guild features
+- **RPG Shop System** — purchase custom avatar outfits, hairstyles, accessories, environment theme packs, Wisdom Elixirs, and Streak Aegises.
+- **Inventory System** — preview locked cosmetics, view owned equipment, equip customized items/themes, and consume elixirs for instant XP.
+- **Daily Login Rewards** — seven-day reward calendar (XP, coins, elixirs, shields, wings) with duplicate-claim protection.
+- **Streak Shield** — purchase a Streak Aegis from the shop to automatically protect streaks from breaking when a day is missed.
+- **Settings Screen** — toggle light/dark theme modes, configure sound effects/notifications, reset progress, and logout.
+- **Dashboard Polish** — display current active environment background, quest completion ratios, active stats, and Quick Shop navigation.
 
 ## Tech Stack
 
@@ -95,7 +97,7 @@ No backend setup required — data persists locally.
 
 ### 3. Run with Supabase (optional)
 
-1. Create a Supabase project and run the schema (see local `docs/SUPABASE_SETUP.md`)
+1. Create a Supabase project and run the SQL schemas (see `supabase/migrations/`)
 2. Set `demoMode = false` in `lib/config/app_config.dart`
 3. Run:
 

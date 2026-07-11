@@ -6,6 +6,7 @@ import 'package:mini_habit_rpg/models/app_user.dart';
 import 'package:mini_habit_rpg/models/daily_quest.dart';
 import 'package:mini_habit_rpg/models/habit.dart';
 import 'package:mini_habit_rpg/models/habit_category.dart';
+import 'package:mini_habit_rpg/models/inventory_item.dart';
 import 'package:mini_habit_rpg/models/mood.dart';
 import 'package:mini_habit_rpg/models/mood_entry.dart';
 import 'package:mini_habit_rpg/models/personality_archetype.dart';
@@ -25,6 +26,8 @@ class DemoDataStore {
   static const _achievementsKey = 'demo_achievements';
   static const _moodHistoryKey = 'demo_mood_history';
   static const _currentMoodKey = 'demo_current_mood';
+  static const _inventoryKey = 'demo_inventory';
+  static const _loginRewardsKey = 'demo_login_rewards';
 
   final Map<String, UserProfile> profiles = {};
   final Map<String, List<Habit>> habitsByUser = {};
@@ -32,6 +35,8 @@ class DemoDataStore {
   final Map<String, List<UserAchievement>> achievementsByUser = {};
   final Map<String, List<MoodEntry>> moodHistoryByUser = {};
   final Map<String, Mood> currentMoodByUser = {};
+  final Map<String, List<UserInventoryItem>> inventoryByUser = {};
+  final Map<String, Map<String, dynamic>> loginRewardsByUser = {};
   final Map<String, String> emailToUid = {};
   final Map<String, String> emailToPassword = {};
 
@@ -45,6 +50,8 @@ class DemoDataStore {
   final _achievementControllers =
       <String, StreamController<List<UserAchievement>>>{};
   final _moodControllers = <String, StreamController<List<MoodEntry>>>{};
+  final _inventoryControllers =
+      <String, StreamController<List<UserInventoryItem>>>{};
 
   Stream<AppUser?> get authStateChanges => _authController.stream;
 
@@ -133,6 +140,27 @@ class DemoDataStore {
       }
     }
 
+    final inventoryRaw = prefs.getString(_inventoryKey);
+    if (inventoryRaw != null) {
+      final map = jsonDecode(inventoryRaw) as Map<String, dynamic>;
+      inventoryByUser.clear();
+      for (final entry in map.entries) {
+        final list = (entry.value as List<dynamic>)
+            .map((e) => UserInventoryItem.fromMap(e['id'] as String, e as Map<String, dynamic>))
+            .toList();
+        inventoryByUser[entry.key] = list;
+      }
+    }
+
+    final loginRewardsRaw = prefs.getString(_loginRewardsKey);
+    if (loginRewardsRaw != null) {
+      final map = jsonDecode(loginRewardsRaw) as Map<String, dynamic>;
+      loginRewardsByUser.clear();
+      for (final entry in map.entries) {
+        loginRewardsByUser[entry.key] = entry.value as Map<String, dynamic>;
+      }
+    }
+
     _loaded = true;
   }
 
@@ -185,6 +213,18 @@ class DemoDataStore {
     }
     await prefs.setString(_currentMoodKey, jsonEncode(currentMoodJson));
 
+    final inventoryJson = <String, dynamic>{};
+    for (final entry in inventoryByUser.entries) {
+      inventoryJson[entry.key] = entry.value.map((i) => i.toMap()).toList();
+    }
+    await prefs.setString(_inventoryKey, jsonEncode(inventoryJson));
+
+    final loginRewardsJson = <String, dynamic>{};
+    for (final entry in loginRewardsByUser.entries) {
+      loginRewardsJson[entry.key] = entry.value;
+    }
+    await prefs.setString(_loginRewardsKey, jsonEncode(loginRewardsJson));
+
     _loaded = true;
   }
 
@@ -201,6 +241,7 @@ class DemoDataStore {
     questsByUser.putIfAbsent(user.uid, () => []);
     achievementsByUser.putIfAbsent(user.uid, () => []);
     moodHistoryByUser.putIfAbsent(user.uid, () => []);
+    inventoryByUser.putIfAbsent(user.uid, () => []);
     await persist();
   }
 
@@ -247,6 +288,13 @@ class DemoDataStore {
     return _moodControllers.putIfAbsent(
       uid,
       () => StreamController<List<MoodEntry>>.broadcast(),
+    );
+  }
+
+  StreamController<List<UserInventoryItem>> inventoryController(String uid) {
+    return _inventoryControllers.putIfAbsent(
+      uid,
+      () => StreamController<List<UserInventoryItem>>.broadcast(),
     );
   }
 
@@ -302,14 +350,29 @@ class DemoDataStore {
     await persist();
   }
 
+  void pushInventoryToStream(String uid) {
+    final list = List<UserInventoryItem>.from(inventoryByUser[uid] ?? []);
+    final controller = inventoryController(uid);
+    if (!controller.isClosed) controller.add(list);
+  }
+
+  Future<void> emitInventory(String uid) async {
+    pushInventoryToStream(uid);
+    await persist();
+  }
+
   List<Habit> habitsFor(String uid) => habitsByUser[uid] ?? [];
   List<DailyQuest> questsFor(String uid) => questsByUser[uid] ?? [];
   List<UserAchievement> achievementsFor(String uid) =>
       achievementsByUser[uid] ?? [];
+  List<UserInventoryItem> inventoryFor(String uid) =>
+      inventoryByUser[uid] ?? [];
 
   Map<String, dynamic> _profileToJson(UserProfile p) => {
         'uid': p.uid,
         'username': p.username,
+        'displayName': p.displayName,
+        'personalityTitle': p.personalityTitle,
         'avatarId': p.avatarId,
         'level': p.level,
         'xp': p.xp,
@@ -329,6 +392,8 @@ class DemoDataStore {
     return UserProfile(
       uid: json['uid'] as String,
       username: json['username'] as String? ?? 'Adventurer',
+      displayName: json['displayName'] as String? ?? json['username'] as String? ?? 'Adventurer',
+      personalityTitle: json['personalityTitle'] as String? ?? 'Novice Questor',
       avatarId: json['avatarId'] as int? ?? 0,
       level: json['level'] as int? ?? 1,
       xp: json['xp'] as int? ?? 0,
@@ -436,5 +501,36 @@ class DemoDataStore {
       recordedAt: DateTime.tryParse(json['recordedAt'] as String? ?? '') ??
           DateTime.now(),
     );
+  }
+
+  Future<void> clearAllUserData(String uid) async {
+    profiles[uid] = UserProfile.initial(uid);
+    habitsByUser[uid] = [];
+    questsByUser[uid] = [];
+    achievementsByUser[uid] = [];
+    moodHistoryByUser[uid] = [];
+    inventoryByUser[uid] = [];
+    loginRewardsByUser.remove(uid);
+    currentMoodByUser[uid] = Mood.motivated;
+
+    final pController = profileController(uid);
+    if (!pController.isClosed) pController.add(profiles[uid]);
+
+    final hController = habitController(uid);
+    if (!hController.isClosed) hController.add([]);
+
+    final qController = questController(uid);
+    if (!qController.isClosed) qController.add([]);
+
+    final aController = achievementController(uid);
+    if (!aController.isClosed) aController.add([]);
+
+    final mController = moodController(uid);
+    if (!mController.isClosed) mController.add([]);
+
+    final iController = inventoryController(uid);
+    if (!iController.isClosed) iController.add([]);
+
+    await persist();
   }
 }
