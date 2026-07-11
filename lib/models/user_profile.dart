@@ -5,6 +5,8 @@ class UserProfile {
   const UserProfile({
     required this.uid,
     required this.username,
+    required this.displayName,
+    required this.personalityTitle,
     required this.avatarId,
     required this.level,
     required this.xp,
@@ -22,6 +24,8 @@ class UserProfile {
 
   final String uid;
   final String username;
+  final String displayName;
+  final String personalityTitle;
   final int avatarId;
   final int level;
   final int xp;
@@ -48,6 +52,8 @@ class UserProfile {
 
   UserProfile copyWith({
     String? username,
+    String? displayName,
+    String? personalityTitle,
     int? avatarId,
     int? level,
     int? xp,
@@ -65,6 +71,8 @@ class UserProfile {
     return UserProfile(
       uid: uid,
       username: username ?? this.username,
+      displayName: displayName ?? this.displayName,
+      personalityTitle: personalityTitle ?? this.personalityTitle,
       avatarId: avatarId ?? this.avatarId,
       level: level ?? this.level,
       xp: xp ?? this.xp,
@@ -86,6 +94,8 @@ class UserProfile {
     return {
       'id': uid,
       'username': username,
+      'display_name': displayName,
+      'personality_title': personalityTitle,
       'avatar': avatarId,
       'level': level,
       'xp': xp,
@@ -106,6 +116,8 @@ class UserProfile {
     return UserProfile(
       uid: uid,
       username: map['username'] as String? ?? 'Adventurer',
+      displayName: (map['display_name'] ?? map['displayName'] ?? map['username']) as String? ?? 'Adventurer',
+      personalityTitle: (map['personality_title'] ?? map['personalityTitle'] ?? 'Novice Questor') as String,
       avatarId: (map['avatar'] ?? map['avatarId']) as int? ?? 0,
       level: map['level'] as int? ?? 1,
       xp: map['xp'] as int? ?? 0,
@@ -135,6 +147,8 @@ class UserProfile {
     return UserProfile(
       uid: uid,
       username: 'Adventurer',
+      displayName: 'Adventurer',
+      personalityTitle: 'Novice Questor',
       avatarId: 0,
       level: 1,
       xp: 0,
