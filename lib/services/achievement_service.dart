@@ -33,4 +33,16 @@ class AchievementService {
 
     return toUnlock;
   }
+
+  Future<List<AchievementType>> unlockDirect({
+    required String userId,
+    required AchievementType type,
+  }) async {
+    final existing = await _repository.getAll(userId);
+    if (existing.any((a) => a.achievementName == type.id && a.unlocked)) {
+      return []; // Already unlocked
+    }
+    await _repository.unlock(userId: userId, type: type);
+    return [type];
+  }
 }

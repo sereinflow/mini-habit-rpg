@@ -5,16 +5,21 @@ import 'package:mini_habit_rpg/models/habit.dart';
 import 'package:mini_habit_rpg/models/habit_category.dart';
 import 'package:mini_habit_rpg/models/mood.dart';
 import 'package:mini_habit_rpg/models/personality_archetype.dart';
+import 'package:mini_habit_rpg/models/shop_item.dart';
 import 'package:mini_habit_rpg/providers/daily_quest_provider.dart';
 import 'package:mini_habit_rpg/providers/habit_provider.dart';
+import 'package:mini_habit_rpg/providers/inventory_provider.dart';
 import 'package:mini_habit_rpg/providers/mood_provider.dart';
 import 'package:mini_habit_rpg/providers/user_provider.dart';
+import 'package:mini_habit_rpg/screens/shop/shop_inventory_screen.dart';
+import 'package:mini_habit_rpg/theme/app_theme.dart';
 import 'package:mini_habit_rpg/theme/mood_theme.dart';
 import 'package:mini_habit_rpg/utils/mood_recommender.dart';
 import 'package:mini_habit_rpg/utils/quotes.dart';
 import 'package:mini_habit_rpg/widgets/achievement_unlock_dialog.dart';
 import 'package:mini_habit_rpg/widgets/character_card.dart';
 import 'package:mini_habit_rpg/widgets/habit_tile.dart';
+import 'package:mini_habit_rpg/widgets/login_rewards_dialog.dart';
 import 'package:mini_habit_rpg/widgets/mood_selector.dart';
 import 'package:mini_habit_rpg/widgets/recommended_tasks_panel.dart';
 import 'package:mini_habit_rpg/widgets/rpg_card.dart';
@@ -37,6 +42,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         context.read<UserProvider>().profile?.archetype ??
         PersonalityArchetype.warrior;
     _quote = MotivationalQuotes.randomFor(archetype);
+
+    // Trigger Login Reward popup on startup if claimable
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      LoginRewardsDialog.show(context);
+    });
   }
 
   Future<void> _onMoodSelected(Mood mood) async {
@@ -59,6 +69,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   Future<void> _onHabitToggle(Habit habit) async {
     final habitProvider = context.read<HabitProvider>();
     final userProvider = context.read<UserProvider>();
+    final inventoryProvider = context.read<InventoryProvider>();
 
     final completed = await habitProvider.toggleComplete(habit);
     if (completed == null || !mounted) return;
@@ -67,6 +78,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       xpReward: completed.xpReward,
       coinReward: completed.coinReward,
       category: completed.category,
+      inventoryProvider: inventoryProvider,
     );
 
     if (!mounted) return;
@@ -75,6 +87,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       coins: completed.coinReward,
       leveledUp: reward.leveledUp,
       achievements: reward.newAchievements,
+      streakShieldUsed: reward.streakShieldUsed,
     );
   }
 
@@ -83,6 +96,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     required int coins,
     required bool leveledUp,
     required List<AchievementType> achievements,
+    required bool streakShieldUsed,
   }) {
     final userProvider = context.read<UserProvider>();
 
@@ -92,6 +106,24 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         backgroundColor: Theme.of(context).colorScheme.primary,
       ),
     );
+
+    if (streakShieldUsed) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('🛡️ Streak Shield Activated!'),
+          content: const Text(
+            'You missed completing quests yesterday, but your Streak Aegis shield was consumed to protect your streak!',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Phew!'),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (leveledUp) {
       showDialog(
@@ -121,6 +153,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final userProvider = context.watch<UserProvider>();
     final habitProvider = context.watch<HabitProvider>();
     final moodProvider = context.watch<MoodProvider>();
+    final inventoryProvider = context.watch<InventoryProvider>();
     final profile = userProvider.profile;
 
     if (profile == null) {
@@ -132,11 +165,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final recommended = MoodRecommender.recommend(habitProvider.habits, mood);
     final recommendedIds = recommended.map((h) => h.id).toSet();
 
+    // Check equipped theme environment
+    final equippedThemeItem = inventoryProvider.getEquipped(ShopItemType.theme);
+    final activeThemeId = equippedThemeItem?.itemId;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
-        decoration: moodTheme.backgroundDecoration,
+        decoration: AppTheme.environmentBackground(
+          equippedThemeId: activeThemeId,
+          archetype: profile.archetype,
+          isDark: isDark,
+        ),
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
@@ -144,6 +186,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               await Future.wait([
                 userProvider.listenToUser(uid),
                 habitProvider.listenToHabits(uid),
+                inventoryProvider.listenToInventory(uid),
               ]);
             },
             child: CustomScrollView(
@@ -152,6 +195,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   floating: true,
                   backgroundColor: Colors.transparent,
                   title: const Text('Quest Board'),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.shopping_bag_outlined),
+                      tooltip: 'Realm Shop',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ShopInventoryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -159,6 +216,55 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     delegate: SliverChildListDelegate([
                       CharacterCard(profile: profile),
                       const SizedBox(height: 16),
+
+                      // Environment & Quick Shop Widget
+                      RpgCard(
+                        accentColor: Theme.of(context).colorScheme.primary,
+                        child: Row(
+                          children: [
+                            const Text('🌲', style: TextStyle(fontSize: 24)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Active Environment',
+                                    style: TextStyle(fontSize: 10, color: Colors.grey),
+                                  ),
+                                  Text(
+                                    equippedThemeItem?.metadata?.name ??
+                                        'Dark Abyss (Default)',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ShopInventoryScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.store, size: 16),
+                              label: const Text('Quick Shop', style: TextStyle(fontSize: 10)),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
                       MoodSelector(
                         selected: moodProvider.currentMood,
                         moodTheme: moodTheme,
